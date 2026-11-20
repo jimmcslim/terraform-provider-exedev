@@ -115,10 +115,52 @@ func TestParseIntegrationImportID(t *testing.T) {
 	}
 }
 
+// tailscaleFixture is a real `integrations list --json` entry, captured after
+// `integrations edit` set the audience and metadata.
+const tailscaleFixture = `[{"name":"tailscale-wif","type":"wif","target":"","hasHeader":false,"hasBasicAuth":false,"externalConnectionEndpointAvailable":false,"repositories":null,"attachments":["vm:mcslim-rex"],"isTeam":false,"comment":"","audience":"api.tailscale.com/TnwKLQQaGU61CNTRL-kYicuTHKg611CNTRL","ttl":"5m","subject":"sub-T7OTKZTFAPAVDEMKJ25SYFYEX5","issuer":"https://exe.dev/issuer/banquette-satyr-blunder","consumerType":"tailscale","metadata":{"client_id":"TnwKLQQaGU61CNTRL-kYicuTHKg611CNTRL","tags":"tag:vm-exe-dev"},"config":{"audience":"api.tailscale.com/TnwKLQQaGU61CNTRL-kYicuTHKg611CNTRL","ttl":"5m","subject":"sub-T7OTKZTFAPAVDEMKJ25SYFYEX5","issuer_id":"banquette-satyr-blunder","consumer_type":"tailscale","metadata":{"client_id":"TnwKLQQaGU61CNTRL-kYicuTHKg611CNTRL","tags":"tag:vm-exe-dev"}}}]`
+
+func TestApplyIntegrationResponseRealTailscaleEntry(t *testing.T) {
+	ctx := context.Background()
+	list, err := parseIntegrationList([]byte(tailscaleFixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	in, ok := findIntegration(list, "tailscale-wif", false)
+	if !ok {
+		t.Fatal("tailscale-wif not found")
+	}
+	m := integrationResourceModel{Consumer: types.StringUnknown(), Audience: types.StringUnknown(),
+		Metadata: types.MapNull(types.StringType), Comment: types.StringNull()}
+	applyIntegrationResponse(ctx, &m, in)
+
+	checks := map[string]string{
+		"issuer":   m.Issuer.ValueString(),
+		"subject":  m.Subject.ValueString(),
+		"consumer": m.Consumer.ValueString(),
+		"audience": m.Audience.ValueString(),
+		"kind":     m.Kind.ValueString(),
+	}
+	want := map[string]string{
+		"issuer":   "https://exe.dev/issuer/banquette-satyr-blunder",
+		"subject":  "sub-T7OTKZTFAPAVDEMKJ25SYFYEX5",
+		"consumer": "tailscale",
+		"audience": "api.tailscale.com/TnwKLQQaGU61CNTRL-kYicuTHKg611CNTRL",
+		"kind":     "wif",
+	}
+	for k, v := range want {
+		if checks[k] != v {
+			t.Errorf("%s = %q, want %q", k, checks[k], v)
+		}
+	}
+	if len(m.Metadata.Elements()) != 2 {
+		t.Errorf("metadata = %v", m.Metadata)
+	}
+}
+
 const listFixture = `[
  {"name":"llm","type":"llm","attachments":["auto:all"],"isTeam":false,"config":{"providers":{}}},
  {"name":"gcpwif","type":"wif","attachments":["vm:example-vm"],"isTeam":false,"comment":"",
-  "config":{"issuer_id":"example-team-workload","subject":"sub-ABCDEFGHIJKLMNOPQRSTUVWXYZ","consumer":"gcp",
+  "config":{"issuer_id":"example-team-workload","subject":"sub-ABCDEFGHIJKLMNOPQRSTUVWXYZ","consumer_type":"gcp",
    "audience":"https://iam.googleapis.com/x","metadata":{"project_id":"p","pool_id":"exe-dev-pool"}}},
  {"name":"gcpwif","type":"wif","attachments":["tag:prod"],"isTeam":true,"config":{"issuer_id":"team-x","subject":"sub-TEAM"}}
 ]`

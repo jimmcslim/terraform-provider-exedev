@@ -61,7 +61,7 @@ type integrationAPIResponse struct {
 type integrationConfig struct {
 	IssuerID string            `json:"issuer_id"`
 	Subject  string            `json:"subject"`
-	Consumer string            `json:"consumer"`
+	Consumer string            `json:"consumer_type"`
 	Audience string            `json:"audience"`
 	Metadata map[string]string `json:"metadata"`
 }
