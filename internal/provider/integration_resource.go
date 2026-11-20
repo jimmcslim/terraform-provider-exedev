@@ -23,6 +23,7 @@ import (
 var (
 	_ resource.Resource                = &integrationResource{}
 	_ resource.ResourceWithImportState = &integrationResource{}
+	_ resource.ResourceWithModifyPlan  = &integrationResource{}
 )
 
 // integrationKindWIF is the exe.dev integration type for Identity Federation.
@@ -161,6 +162,22 @@ func (r *integrationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				},
 			},
 		},
+	}
+}
+
+// ModifyPlan marks id unknown when the name changes, since id is the name.
+func (r *integrationResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+	var planName, stateName types.String
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("name"), &planName)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("name"), &stateName)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !planName.Equal(stateName) {
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("id"), types.StringUnknown())...)
 	}
 }
 
